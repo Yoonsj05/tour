@@ -1,0 +1,252 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>지역별 여행지 카드북</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f2f7fa;
+  color: #243746;
+}
+
+header {
+  background: #1976a3;
+  color: white;
+  padding: 35px 20px;
+  text-align: center;
+}
+
+main {
+  max-width: 1050px;
+  padding: 20px;
+  margin: auto;
+}
+
+.search-box {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+select {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+#status {
+  margin: 20px 0;
+}
+
+#resultSection[hidden] {
+  display: none;
+}
+
+#cards {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(230px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 3px 10px #0001;
+}
+
+.card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.card-content {
+  padding: 15px;
+}
+
+.card-content p {
+  color: #666;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>지역별 여행지 카드북</h1>
+  <p>대한민국의 아름다운 여행지를 찾아보세요!</p>
+</header>
+
+<main>
+  <div class="search-box">
+    <h2>여행 지역 선택</h2>
+
+    <select id="regionSelect">
+      <option value="">지역을 선택하세요</option>
+      <option value="11">서울</option>
+      <option value="26">부산</option>
+      <option value="27">대구</option>
+      <option value="28">인천</option>
+      <option value="29">광주</option>
+      <option value="30">대전</option>
+      <option value="31">울산</option>
+      <option value="36">세종</option>
+      <option value="41">경기</option>
+      <option value="51">강원</option>
+      <option value="43">충북</option>
+      <option value="44">충남</option>
+      <option value="52">전북</option>
+      <option value="46">전남</option>
+      <option value="47">경북</option>
+      <option value="48">경남</option>
+      <option value="50">제주</option>
+    </select>
+  </div>
+
+  <p id="status">저장된 지역 정보를 확인하는 중...</p>
+
+  <section id="resultSection" hidden>
+    <h2 id="regionTitle"></h2>
+    <div id="cards"></div>
+  </section>
+</main>
+
+<script type="module">
+
+import { initializeApp } from
+"https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+
+import { getFirestore, doc, getDoc } from
+"https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+
+// Firebase 콘솔에서 복사한 설정으로 변경
+const firebaseConfig = {
+  apiKey: "여기에_API_KEY",
+  authDomain: "여기에_AUTH_DOMAIN",
+  projectId: "여기에_PROJECT_ID",
+  storageBucket: "여기에_STORAGE_BUCKET",
+  messagingSenderId: "여기에_SENDER_ID",
+  appId: "여기에_APP_ID"
+};
+
+// 다음 단계에서 Node.js 서버 주소로 변경
+const SERVER_URL =
+  "https://asia-northeast3-YOUR_PROJECT_ID.cloudfunctions.net/travelApi";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const regionSelect = document.getElementById("regionSelect");
+const status = document.getElementById("status");
+const resultSection = document.getElementById("resultSection");
+const regionTitle = document.getElementById("regionTitle");
+const cards = document.getElementById("cards");
+
+function showCards(data) {
+  if (!data) {
+    regionSelect.value = "";
+    resultSection.hidden = true;
+    cards.replaceChildren();
+    status.textContent =
+      "저장된 여행지가 없어요. 지역을 선택해 주세요.";
+    return;
+  }
+
+  regionSelect.value = data.regionCode;
+  regionTitle.textContent = data.regionName + " 관광지";
+  cards.replaceChildren();
+
+  const items = Array.isArray(data.items) ? data.items : [];
+
+  items.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const image = document.createElement("img");
+    image.src = item.image;
+    image.alt = item.title;
+    image.loading = "lazy";
+
+    const content = document.createElement("div");
+    content.className = "card-content";
+
+    const title = document.createElement("h3");
+    title.textContent = item.title;
+
+    const address = document.createElement("p");
+    address.textContent = item.address;
+
+    content.append(title, address);
+    card.append(image, content);
+    cards.append(card);
+  });
+
+  resultSection.hidden = false;
+  status.textContent =
+    `${data.regionName} 관광정보 ${items.length}개를 표시했어요.`;
+}
+
+async function loadSavedData() {
+  try {
+    const reference = doc(db, "travelCardbook", "latest");
+    const snapshot = await getDoc(reference);
+
+    if (snapshot.exists()) {
+      showCards(snapshot.data());
+    } else {
+      showCards(null);
+    }
+  } catch (error) {
+    status.textContent = "Firebase 오류: " + error.message;
+  }
+}
+
+regionSelect.addEventListener("change", async () => {
+  const regionCode = regionSelect.value;
+
+  if (!regionCode) return;
+
+  regionSelect.disabled = true;
+  status.textContent = "관광정보를 불러오는 중...";
+
+  try {
+    const response = await fetch(SERVER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ regionCode })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "관광정보 조회 실패");
+    }
+
+    showCards(result.saved);
+  } catch (error) {
+    status.textContent = "오류: " + error.message;
+  } finally {
+    regionSelect.disabled = false;
+  }
+});
+
+loadSavedData();
+
+</script>
+</body>
+</html>
