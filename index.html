@@ -13,72 +13,100 @@
 
 body {
   margin: 0;
+  background: #f3f7fa;
   font-family: Arial, sans-serif;
-  background: #f2f7fa;
-  color: #243746;
+  color: #253746;
 }
 
 header {
-  background: #1976a3;
-  color: white;
-  padding: 35px 20px;
   text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(120deg, #176b92, #20a4ac);
+  color: white;
+}
+
+header h1 {
+  margin: 0 0 12px;
 }
 
 main {
-  max-width: 1050px;
-  padding: 20px;
-  margin: auto;
+  max-width: 1100px;
+  margin: 30px auto;
+  padding: 0 20px;
 }
 
 .search-box {
   background: white;
-  padding: 24px;
-  border-radius: 12px;
+  padding: 25px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px #00000012;
 }
 
 select {
   width: 100%;
-  padding: 12px;
+  padding: 14px;
+  margin-top: 10px;
   font-size: 16px;
-  border-radius: 8px;
   border: 1px solid #ccc;
+  border-radius: 9px;
+  background: white;
 }
 
 #status {
   margin: 20px 0;
+  color: #526779;
+  line-height: 1.6;
 }
 
 #resultSection[hidden] {
   display: none;
 }
 
+#resultSection h2 {
+  margin: 25px 0 15px;
+}
+
 #cards {
   display: grid;
-  grid-template-columns:
-    repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 20px;
 }
 
 .card {
   background: white;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 3px 10px #0001;
+  box-shadow: 0 4px 12px #00000012;
 }
 
 .card img {
   width: 100%;
-  height: 180px;
+  height: 185px;
   object-fit: cover;
+  display: block;
 }
 
 .card-content {
-  padding: 15px;
+  padding: 16px;
+}
+
+.card-content h3 {
+  font-size: 17px;
+  margin: 0 0 10px;
 }
 
 .card-content p {
-  color: #666;
+  color: #667;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+footer {
+  text-align: center;
+  margin-top: 50px;
+  padding: 20px;
+  color: #777;
+  font-size: 13px;
 }
 </style>
 </head>
@@ -116,7 +144,7 @@ select {
     </select>
   </div>
 
-  <p id="status">저장된 지역 정보를 확인하는 중...</p>
+  <p id="status">Firebase 정보를 확인하는 중...</p>
 
   <section id="resultSection" hidden>
     <h2 id="regionTitle"></h2>
@@ -124,15 +152,33 @@ select {
   </section>
 </main>
 
+<footer>
+  관광정보 출처: 한국관광공사 TourAPI
+</footer>
+
 <script type="module">
 
+// ======================================
+// 1. Firebase 불러오기
+// ======================================
+
 import { initializeApp } from
-"https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
+"https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 
-import { getFirestore, doc, getDoc } from
-"https://www.gstatic.com/firebasejs/13.0.0/firebase-firestore.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc
+} from
+"https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
-// Firebase 콘솔에서 복사한 설정으로 변경
+
+// ======================================
+// 2. Firebase 설정
+// 반드시 네 실제 설정으로 변경!
+// ======================================
+
 const firebaseConfig = {
   apiKey: "AIzaSyCCkTrk8fPC0JyoNZZsom_XKTLIwl2aVPI",
   authDomain: "my-project-4c69a.firebaseapp.com",
@@ -143,36 +189,90 @@ const firebaseConfig = {
   measurementId: "G-50DXVDFT4V"
 };
 
-// 다음 단계에서 Node.js 서버 주소로 변경
-const SERVER_URL =
-  "https://asia-northeast3-YOUR_PROJECT_ID.cloudfunctions.net/travelApi";
+
+// ======================================
+// 3. 공공데이터 API 인증키
+// 반드시 네 실제 일반 인증키로 변경!
+// ======================================
+
+const TOUR_API_KEY = "여기에_공공데이터_일반인증키";
+
+
+// ======================================
+// 4. Firebase 연결
+// ======================================
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const regionSelect = document.getElementById("regionSelect");
-const status = document.getElementById("status");
-const resultSection = document.getElementById("resultSection");
-const regionTitle = document.getElementById("regionTitle");
-const cards = document.getElementById("cards");
+const regionSelect =
+  document.getElementById("regionSelect");
+
+const statusEl =
+  document.getElementById("status");
+
+const resultSection =
+  document.getElementById("resultSection");
+
+const regionTitle =
+  document.getElementById("regionTitle");
+
+const cards =
+  document.getElementById("cards");
+
+const savedRef =
+  doc(db, "travelCardbook", "latest");
+
+const regions = {
+  "11": "서울",
+  "26": "부산",
+  "27": "대구",
+  "28": "인천",
+  "29": "광주",
+  "30": "대전",
+  "31": "울산",
+  "36": "세종",
+  "41": "경기",
+  "51": "강원",
+  "43": "충북",
+  "44": "충남",
+  "52": "전북",
+  "46": "전남",
+  "47": "경북",
+  "48": "경남",
+  "50": "제주"
+};
+
+
+// ======================================
+// 5. 관광정보 카드 표시
+// ======================================
 
 function showCards(data) {
+
   if (!data) {
-    regionSelect.value = "";
     resultSection.hidden = true;
     cards.replaceChildren();
-    status.textContent =
+
+    statusEl.textContent =
       "저장된 여행지가 없어요. 지역을 선택해 주세요.";
+
     return;
   }
 
   regionSelect.value = data.regionCode;
-  regionTitle.textContent = data.regionName + " 관광지";
+
+  regionTitle.textContent =
+    data.regionName + " 관광지";
+
   cards.replaceChildren();
 
-  const items = Array.isArray(data.items) ? data.items : [];
+  const items = Array.isArray(data.items)
+    ? data.items
+    : [];
 
   items.forEach(item => {
+
     const card = document.createElement("div");
     card.className = "card";
 
@@ -181,7 +281,9 @@ function showCards(data) {
     image.alt = item.title;
     image.loading = "lazy";
 
-    const content = document.createElement("div");
+    const content =
+      document.createElement("div");
+
     content.className = "card-content";
 
     const title = document.createElement("h3");
@@ -193,61 +295,172 @@ function showCards(data) {
     content.append(title, address);
     card.append(image, content);
     cards.append(card);
+
   });
 
   resultSection.hidden = false;
-  status.textContent =
-    `${data.regionName} 관광정보 ${items.length}개를 표시했어요.`;
+
+  statusEl.textContent =
+    data.regionName + " 관광정보 " +
+    items.length + "개를 표시했어요.";
 }
 
+
+// ======================================
+// 6. Firebase 저장 정보 불러오기
+// ======================================
+
 async function loadSavedData() {
+
   try {
-    const reference = doc(db, "travelCardbook", "latest");
-    const snapshot = await getDoc(reference);
+
+    const snapshot = await getDoc(savedRef);
 
     if (snapshot.exists()) {
       showCards(snapshot.data());
     } else {
       showCards(null);
     }
+
   } catch (error) {
-    status.textContent = "Firebase 오류: " + error.message;
+
+    console.error(error);
+
+    statusEl.textContent =
+      "Firebase 불러오기 실패: " + error.message;
+
   }
 }
 
-regionSelect.addEventListener("change", async () => {
-  const regionCode = regionSelect.value;
 
-  if (!regionCode) return;
+// ======================================
+// 7. 공공데이터 API 요청
+// ======================================
 
-  regionSelect.disabled = true;
-  status.textContent = "관광정보를 불러오는 중...";
+async function getTourData(regionCode) {
 
-  try {
-    const response = await fetch(SERVER_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({ regionCode })
-    });
+  const url = new URL(
+    "https://apis.data.go.kr/B551011/KorService2/areaBasedList2"
+  );
 
-    const result = await response.json();
+  url.searchParams.set(
+    "serviceKey",
+    TOUR_API_KEY.trim()
+  );
 
-    if (!response.ok) {
-      throw new Error(result.error || "관광정보 조회 실패");
-    }
+  url.searchParams.set("MobileOS", "WEB");
+  url.searchParams.set("MobileApp", "TravelCardbook");
+  url.searchParams.set("_type", "json");
+  url.searchParams.set("numOfRows", "18");
+  url.searchParams.set("pageNo", "1");
+  url.searchParams.set("arrange", "O");
+  url.searchParams.set("contentTypeId", "12");
+  url.searchParams.set("lDongRegnCd", regionCode);
 
-    showCards(result.saved);
-  } catch (error) {
-    status.textContent = "오류: " + error.message;
-  } finally {
-    regionSelect.disabled = false;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(
+      "관광정보 API HTTP 오류: " + response.status
+    );
   }
-});
+
+  const result = await response.json();
+
+  const header = result.response?.header;
+
+  if (
+    !header ||
+    String(header.resultCode) !== "0000"
+  ) {
+    throw new Error(
+      header?.resultMsg || "공공데이터 API 오류"
+    );
+  }
+
+  const rawItems =
+    result.response?.body?.items?.item || [];
+
+  const list = Array.isArray(rawItems)
+    ? rawItems
+    : [rawItems];
+
+  const items = list
+    .map(item => ({
+      title: item.title || "이름 없음",
+      address: item.addr1 || "주소 정보 없음",
+      image: (
+        item.firstimage ||
+        item.firstimage2 ||
+        ""
+      ).replace(/^http:\/\//, "https://")
+    }))
+    .filter(item => item.image);
+
+  return items;
+}
+
+
+// ======================================
+// 8. 지역 선택 후 관광정보 저장
+// ======================================
+
+regionSelect.addEventListener(
+  "change",
+  async function () {
+
+    const regionCode = regionSelect.value;
+
+    if (!regionCode) return;
+
+    regionSelect.disabled = true;
+
+    statusEl.textContent =
+      "관광정보를 불러오는 중...";
+
+    try {
+
+      // 공공데이터 조회
+      const items =
+        await getTourData(regionCode);
+
+      // Firebase 저장 데이터
+      const data = {
+        regionCode: regionCode,
+        regionName: regions[regionCode],
+        items: items,
+        updatedAt: Date.now()
+      };
+
+      // Firestore 저장
+      await setDoc(savedRef, data);
+
+      // 화면 표시
+      showCards(data);
+
+    } catch (error) {
+
+      console.error(error);
+
+      statusEl.textContent =
+        "오류: " + error.message;
+
+    } finally {
+
+      regionSelect.disabled = false;
+
+    }
+  }
+);
+
+
+// ======================================
+// 9. 처음 접속 시 저장 데이터 복원
+// ======================================
 
 loadSavedData();
 
 </script>
+
 </body>
 </html>
